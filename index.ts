@@ -3,6 +3,7 @@ const readline = require('readline');
 
 type Note = {
   id: number;
+  title: string;
   content: string;
   tags: string[];
   createdAt: string;
@@ -19,6 +20,17 @@ const askQuestion = (query: string): Promise<string> => {
   });
 };
 
+function noteTemplate(note: Note): void {
+  const date = new Date(note.createdAt);
+  console.log('\x1b[33m━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m'); // Yellow separator
+  console.log(
+    `\x1b[1m${note.id}. ${note.title} (${date.toLocaleString()})\x1b[0m\n`
+  ); // Bold note title
+  console.log(`\x1b[37m${note.content}\x1b[0m\n`); // White note content
+  console.log(`\x1b[35mTags: \x1b[32m${note.tags.join(', ')}\x1b[0m`); // Magenta label + Green tags
+  console.log('\x1b[33m━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m'); // Yellow separator
+}
+
 function loadNotes(): Note[] {
   if (existsSync('./notes.json')) {
     const data = readFileSync('./notes.json', 'utf-8');
@@ -29,13 +41,9 @@ function loadNotes(): Note[] {
 
 function showNotes(): void {
   const notes = loadNotes();
-  console.log('Notes:');
+  console.log(`\n\x1b[1m\x1b[31mTotal notes: \x1b[0m${notes.length}`);
   notes.forEach((note: Note) => {
-    console.log('\x1b[33m━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m'); // Yellow separator
-    console.log(`\x1b[1mNote #${note.id}\x1b[0m`); // Bold note title
-    console.log(`\x1b[37m${note.content}\x1b[0m`); // White note content
-    console.log(`\x1b[35mTags: \x1b[32m${note.tags.join(', ')}\x1b[0m`); // Magenta label + Green tags
-    console.log('\x1b[33m━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m\n'); // Yellow separator
+    noteTemplate(note);
   });
 }
 
@@ -45,7 +53,7 @@ function saveNotes(notes: Note[]): void {
 
 async function addNote(): Promise<void> {
   const notes = loadNotes();
-
+  const noteTitle = (await askQuestion('Enter note title: ')) as string;
   const noteContent = (await askQuestion('Enter note: ')) as string;
   const noteTags = (await askQuestion(
     'Enter tags (comma separated): '
@@ -53,6 +61,7 @@ async function addNote(): Promise<void> {
 
   const note = {
     id: notes.length + 1,
+    title: noteTitle.trim(),
     content: noteContent.trim(),
     tags: noteTags.split(',').map((tag: string) => tag.trim()),
     createdAt: new Date().toISOString(),
@@ -64,9 +73,27 @@ async function addNote(): Promise<void> {
   rl.close();
 }
 
+async function findNotes(): Promise<void> {
+  const notes = loadNotes();
+  const searchQuery = (await askQuestion('Enter search query: ')) as string;
+  const matchingNotes = notes.filter((note: Note) => {
+    if (searchQuery === '') return true;
+    const matchByTitle = note.title.toLowerCase() === searchQuery.toLowerCase();
+    const matchByContent = note.content.includes(searchQuery.toLowerCase());
+    const matchByTag = note.tags.some((tag: string) =>
+      tag.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    return matchByTitle || matchByContent || matchByTag;
+  });
+  matchingNotes.forEach((note: Note) => {
+    noteTemplate(note);
+  });
+  rl.close();
+}
+
 async function showMenu(): Promise<void> {
   const command = (await askQuestion(
-    'Enter a command (add, list, quit): '
+    'Enter a command (add, list, find, quit): '
   )) as string;
 
   switch (command) {
@@ -75,6 +102,9 @@ async function showMenu(): Promise<void> {
       break;
     case 'list':
       showNotes();
+      break;
+    case 'find':
+      findNotes();
       break;
     case 'quit':
       rl.close();
